@@ -1,0 +1,25 @@
+# Raw dataset (43k records, large) - re-download from PhysioNet/CinC 2020
+data/training/
+data/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+
+# Generated / cached artifacts
+*.npy
+*.npz
+*.pkl
+*.joblib
+results/cache/
+
+# Word lock files, OS / editor junk
+~$*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
