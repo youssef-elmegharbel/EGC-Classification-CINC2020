@@ -1,0 +1,53 @@
+{
+ "logreg|a": {
+  "clf__C": 1
+ },
+ "knn|a": {
+  "clf__n_neighbors": 5
+ },
+ "svm|a": {
+  "clf__C": 10,
+  "clf__gamma": "scale"
+ },
+ "rf|a": {
+  "clf__max_depth": 16,
+  "clf__min_samples_leaf": 1
+ },
+ "lgbm|a": {
+  "clf__num_leaves": 15,
+  "clf__learning_rate": 0.05
+ },
+ "mlp|a": {
+  "clf__hidden_layer_sizes": [
+   128,
+   64
+  ],
+  "clf__alpha": 0.01
+ },
+ "knn|a|r2": {
+  "clf__n_neighbors": 5,
+  "clf__p": 1
+ },
+ "svm|a|r2": {
+  "clf__C": 3,
+  "clf__gamma": "scale"
+ },
+ "rf|a|r2": {
+  "clf__max_depth": 14,
+  "clf__min_samples_leaf": 2,
+  "clf__max_features": 0.1
+ },
+ "lgbm|a|r2": {
+  "clf__num_leaves": 15,
+  "clf__learning_rate": 0.03,
+  "clf__min_child_samples": 20,
+  "clf__reg_lambda": 1.0
+ },
+ "mlp|a|r2": {
+  "clf__hidden_layer_sizes": [
+   128,
+   64
+  ],
+  "clf__alpha": 1.0
+ }
+}

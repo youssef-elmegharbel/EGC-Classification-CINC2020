@@ -1,0 +1,132 @@
+name,group,description,unit
+hr_mean,rhythm,Mean heart rate (60 / mean RR),bpm
+rr_mean,rhythm,Mean RR interval,ms
+rr_median,rhythm,Median RR interval,ms
+rr_std,rhythm,Std of RR intervals (SDNN),ms
+rr_min,rhythm,Shortest RR interval,ms
+rr_max,rhythm,Longest RR interval,ms
+rr_cv,rhythm,Coefficient of variation of RR (std / mean),ratio
+rmssd,rhythm,Root mean square of successive RR differences,ms
+pnn50,rhythm,Fraction of successive RR differences > 50 ms,ratio
+rr_irregularity,rhythm,Mean |successive RR diff| / mean RR (AF marker),ratio
+rr_short_frac,rhythm,"Fraction of RR < 0.8 x median RR (premature beats, PAC marker)",ratio
+n_beats,rhythm,Number of detected R peaks in the 10 s window,count
+pr_interval,intervals,"PR interval (P onset to QRS onset), median over beats",ms
+qrs_duration,intervals,"QRS duration (R onset to R offset), median over beats",ms
+qt_interval,intervals,"QT interval (QRS onset to T offset), median over beats",ms
+qtc_bazett,intervals,QT corrected by Bazett: QT / sqrt(RR in s),ms
+p_duration,intervals,"P-wave duration (P onset to offset), median over beats",ms
+p_detected_frac,intervals,Fraction of beats with a prominent P wave (baseline-corrected |amp| >= 0.025 mV; low in AF),ratio
+I_r_amp,per_lead,Lead I: max within QRS window (R wave) (median over beats),mV
+I_s_amp,per_lead,Lead I: min within QRS window (S wave) (median over beats),mV
+I_t_amp,per_lead,Lead I: signed amplitude at T peak (median over beats),mV
+I_p_amp,per_lead,Lead I: signed amplitude at P peak (median over beats),mV
+I_std,per_lead,Lead I: signal standard deviation,mV
+I_skew,per_lead,Lead I: signal skewness,
+I_kurt,per_lead,Lead I: signal excess kurtosis,
+I_energy,per_lead,Lead I: mean squared amplitude,mV^2
+II_r_amp,per_lead,Lead II: max within QRS window (R wave) (median over beats),mV
+II_s_amp,per_lead,Lead II: min within QRS window (S wave) (median over beats),mV
+II_t_amp,per_lead,Lead II: signed amplitude at T peak (median over beats),mV
+II_p_amp,per_lead,Lead II: signed amplitude at P peak (median over beats),mV
+II_std,per_lead,Lead II: signal standard deviation,mV
+II_skew,per_lead,Lead II: signal skewness,
+II_kurt,per_lead,Lead II: signal excess kurtosis,
+II_energy,per_lead,Lead II: mean squared amplitude,mV^2
+III_r_amp,per_lead,Lead III: max within QRS window (R wave) (median over beats),mV
+III_s_amp,per_lead,Lead III: min within QRS window (S wave) (median over beats),mV
+III_t_amp,per_lead,Lead III: signed amplitude at T peak (median over beats),mV
+III_p_amp,per_lead,Lead III: signed amplitude at P peak (median over beats),mV
+III_std,per_lead,Lead III: signal standard deviation,mV
+III_skew,per_lead,Lead III: signal skewness,
+III_kurt,per_lead,Lead III: signal excess kurtosis,
+III_energy,per_lead,Lead III: mean squared amplitude,mV^2
+aVR_r_amp,per_lead,Lead aVR: max within QRS window (R wave) (median over beats),mV
+aVR_s_amp,per_lead,Lead aVR: min within QRS window (S wave) (median over beats),mV
+aVR_t_amp,per_lead,Lead aVR: signed amplitude at T peak (median over beats),mV
+aVR_p_amp,per_lead,Lead aVR: signed amplitude at P peak (median over beats),mV
+aVR_std,per_lead,Lead aVR: signal standard deviation,mV
+aVR_skew,per_lead,Lead aVR: signal skewness,
+aVR_kurt,per_lead,Lead aVR: signal excess kurtosis,
+aVR_energy,per_lead,Lead aVR: mean squared amplitude,mV^2
+aVL_r_amp,per_lead,Lead aVL: max within QRS window (R wave) (median over beats),mV
+aVL_s_amp,per_lead,Lead aVL: min within QRS window (S wave) (median over beats),mV
+aVL_t_amp,per_lead,Lead aVL: signed amplitude at T peak (median over beats),mV
+aVL_p_amp,per_lead,Lead aVL: signed amplitude at P peak (median over beats),mV
+aVL_std,per_lead,Lead aVL: signal standard deviation,mV
+aVL_skew,per_lead,Lead aVL: signal skewness,
+aVL_kurt,per_lead,Lead aVL: signal excess kurtosis,
+aVL_energy,per_lead,Lead aVL: mean squared amplitude,mV^2
+aVF_r_amp,per_lead,Lead aVF: max within QRS window (R wave) (median over beats),mV
+aVF_s_amp,per_lead,Lead aVF: min within QRS window (S wave) (median over beats),mV
+aVF_t_amp,per_lead,Lead aVF: signed amplitude at T peak (median over beats),mV
+aVF_p_amp,per_lead,Lead aVF: signed amplitude at P peak (median over beats),mV
+aVF_std,per_lead,Lead aVF: signal standard deviation,mV
+aVF_skew,per_lead,Lead aVF: signal skewness,
+aVF_kurt,per_lead,Lead aVF: signal excess kurtosis,
+aVF_energy,per_lead,Lead aVF: mean squared amplitude,mV^2
+V1_r_amp,per_lead,Lead V1: max within QRS window (R wave) (median over beats),mV
+V1_s_amp,per_lead,Lead V1: min within QRS window (S wave) (median over beats),mV
+V1_t_amp,per_lead,Lead V1: signed amplitude at T peak (median over beats),mV
+V1_p_amp,per_lead,Lead V1: signed amplitude at P peak (median over beats),mV
+V1_std,per_lead,Lead V1: signal standard deviation,mV
+V1_skew,per_lead,Lead V1: signal skewness,
+V1_kurt,per_lead,Lead V1: signal excess kurtosis,
+V1_energy,per_lead,Lead V1: mean squared amplitude,mV^2
+V2_r_amp,per_lead,Lead V2: max within QRS window (R wave) (median over beats),mV
+V2_s_amp,per_lead,Lead V2: min within QRS window (S wave) (median over beats),mV
+V2_t_amp,per_lead,Lead V2: signed amplitude at T peak (median over beats),mV
+V2_p_amp,per_lead,Lead V2: signed amplitude at P peak (median over beats),mV
+V2_std,per_lead,Lead V2: signal standard deviation,mV
+V2_skew,per_lead,Lead V2: signal skewness,
+V2_kurt,per_lead,Lead V2: signal excess kurtosis,
+V2_energy,per_lead,Lead V2: mean squared amplitude,mV^2
+V3_r_amp,per_lead,Lead V3: max within QRS window (R wave) (median over beats),mV
+V3_s_amp,per_lead,Lead V3: min within QRS window (S wave) (median over beats),mV
+V3_t_amp,per_lead,Lead V3: signed amplitude at T peak (median over beats),mV
+V3_p_amp,per_lead,Lead V3: signed amplitude at P peak (median over beats),mV
+V3_std,per_lead,Lead V3: signal standard deviation,mV
+V3_skew,per_lead,Lead V3: signal skewness,
+V3_kurt,per_lead,Lead V3: signal excess kurtosis,
+V3_energy,per_lead,Lead V3: mean squared amplitude,mV^2
+V4_r_amp,per_lead,Lead V4: max within QRS window (R wave) (median over beats),mV
+V4_s_amp,per_lead,Lead V4: min within QRS window (S wave) (median over beats),mV
+V4_t_amp,per_lead,Lead V4: signed amplitude at T peak (median over beats),mV
+V4_p_amp,per_lead,Lead V4: signed amplitude at P peak (median over beats),mV
+V4_std,per_lead,Lead V4: signal standard deviation,mV
+V4_skew,per_lead,Lead V4: signal skewness,
+V4_kurt,per_lead,Lead V4: signal excess kurtosis,
+V4_energy,per_lead,Lead V4: mean squared amplitude,mV^2
+V5_r_amp,per_lead,Lead V5: max within QRS window (R wave) (median over beats),mV
+V5_s_amp,per_lead,Lead V5: min within QRS window (S wave) (median over beats),mV
+V5_t_amp,per_lead,Lead V5: signed amplitude at T peak (median over beats),mV
+V5_p_amp,per_lead,Lead V5: signed amplitude at P peak (median over beats),mV
+V5_std,per_lead,Lead V5: signal standard deviation,mV
+V5_skew,per_lead,Lead V5: signal skewness,
+V5_kurt,per_lead,Lead V5: signal excess kurtosis,
+V5_energy,per_lead,Lead V5: mean squared amplitude,mV^2
+V6_r_amp,per_lead,Lead V6: max within QRS window (R wave) (median over beats),mV
+V6_s_amp,per_lead,Lead V6: min within QRS window (S wave) (median over beats),mV
+V6_t_amp,per_lead,Lead V6: signed amplitude at T peak (median over beats),mV
+V6_p_amp,per_lead,Lead V6: signed amplitude at P peak (median over beats),mV
+V6_std,per_lead,Lead V6: signal standard deviation,mV
+V6_skew,per_lead,Lead V6: signal skewness,
+V6_kurt,per_lead,Lead V6: signal excess kurtosis,
+V6_energy,per_lead,Lead V6: mean squared amplitude,mV^2
+spec_band0_rel,spectral,Lead II relative Welch power 0.5-5 Hz,ratio
+spec_band1_rel,spectral,Lead II relative Welch power 5-15 Hz,ratio
+spec_band2_rel,spectral,Lead II relative Welch power 15-25 Hz,ratio
+spec_band3_rel,spectral,Lead II relative Welch power 25-40 Hz,ratio
+spec_entropy,spectral,Lead II spectral entropy (0.5-40 Hz),ratio
+spec_dom_freq,spectral,Lead II dominant frequency (0.5-40 Hz),Hz
+spec_centroid,spectral,Lead II spectral centroid (0.5-40 Hz),Hz
+wav_d1_rel,wavelet,Lead II db4 detail level 1 relative energy,ratio
+wav_d2_rel,wavelet,Lead II db4 detail level 2 relative energy,ratio
+wav_d3_rel,wavelet,Lead II db4 detail level 3 relative energy,ratio
+wav_d4_rel,wavelet,Lead II db4 detail level 4 relative energy,ratio
+wav_d5_rel,wavelet,Lead II db4 detail level 5 relative energy,ratio
+wav_a5_rel,wavelet,Lead II db4 level-5 approximation relative energy,ratio
+wav_entropy,wavelet,Shannon entropy of the wavelet energy distribution,nats
+spec_log_power,spectral,Lead II log10 total Welch power 0.5-40 Hz (z-scored signal),log10
+age,patient,Age from header (NaN if missing),years
+sex_male,patient,"1 = male, 0 = female, NaN = unknown",binary

@@ -29,3 +29,8 @@ docs/
 
 # Claude Code project instructions (personal)
 CLAUDE.md
+
+# Test / run noise
+.pytest_cache/
+*.tmp
+results/logs/

@@ -1,9 +1,29 @@
-numpy
-scipy
-pandas
-scikit-learn
-matplotlib
-seaborn
-wfdb
+# Core
+numpy>=2.0
+scipy>=1.14
+pandas>=2.2
+scikit-learn>=1.6
+joblib>=1.4
+pyarrow>=17            # parquet
+matplotlib>=3.9
+seaborn>=0.13
+
+# ECG loading and feature extraction
+wfdb>=4.1
+neurokit2>=0.2.10
+PyWavelets>=1.6
+
+# Models and Phase 1 methods (M1 models, M2 reduction, M3 selection)
+lightgbm>=4.3
+umap-learn>=0.5
+mlxtend>=0.23
+deap>=1.4
+
+# Notebooks, report, tests
 jupyter
-python-docx
+python-docx>=1.1
+docxcompose>=1.4       # merges the per-member report sections
+pytest>=8
+
+# NOTE: PyTorch is NOT needed in Phase 1. If it is ever added on Windows, install it with
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
