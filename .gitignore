@@ -23,3 +23,9 @@ results/cache/
 Thumbs.db
 .vscode/
 .idea/
+
+# Project docs (plans, cover sheets, etc.)
+docs/
+
+# Claude Code project instructions (personal)
+CLAUDE.md
