@@ -4,7 +4,8 @@ folds only, shared 5 folds, src.evaluate.cv_evaluate). Never touches the 20% tes
 Stage 1: every group-1 method x dimension {2, 10, 20} (PCA/SVD: 95% variance, LDA: 5) x
          {logreg, knn, svm}.   Stage 2: LightGBM at each method's best dimension.
 Outputs: results/models/m2/downstream_cv.csv, best_reducer.json, results/figures/28_*, 29_*
-Run:  python scripts/run_m2_downstream.py
+Run:  python scripts/run_m2_downstream.py              (full run, ~25 min)
+      python scripts/run_m2_downstream.py --handoff-only (rebuild best_reducer.json from the CSV)
 """
 import json
 import shutil
@@ -36,7 +37,7 @@ KW = {"KernelPCA_rbf": {"gamma": 0.005}}
 def configs(n95):
     yield "none", None, 131
     yield "PCA", 0.95, n95
-    yield "SVD", n95, n95
+    yield "SVD", n95, n95   # n95 from the full 80% (not per fold): small leak, noted in the report
     yield "LDA", 5, 5
     for m in ["KernelPCA_rbf", "KernelPCA_poly", "UMAP", "Isomap", "LLE", "LLE_modified"]:
         for d in (2, 10, 20):
@@ -55,6 +56,45 @@ def run(method, ncomp, dim, clf, X, y, folds, cache):
     s = summary_columns(res["row"])
     print(name, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()}, flush=True)
     return row
+
+
+def write_handoff(df: pd.DataFrame) -> dict:
+    """Choose M2's hand-off reducer from downstream_cv.csv and write best_reducer.json.
+
+    Rule: among reducer runs (method != 'none') NOT flagged overfit by evaluate.py, take the highest
+    CV macro-F1. kNN uses weights='distance', so its train score is always 1.0 and it is always flagged;
+    excluding flagged runs keeps the hand-off honest. 'parsimonious' = smallest dimension within 0.01 of best.
+    """
+    red_runs = df[(df.method != "none") & (df.flag == "ok")]
+    best = red_runs.sort_values("f1_macro_val_mean", ascending=False).iloc[0]
+    near = (red_runs[red_runs.f1_macro_val_mean >= best.f1_macro_val_mean - 0.01]
+            .sort_values(["dim", "f1_macro_val_mean"], ascending=[True, False]).iloc[0])
+    none_best = df[df.method == "none"].f1_macro_val_mean.max()
+    top_any = df[df.method != "none"].sort_values("f1_macro_val_mean", ascending=False).iloc[0]
+
+    def entry(r):
+        return {"method": r.method, "n_components": int(r.dim), "dim": int(r.dim), "classifier": r.clf,
+                "cv_f1_macro": round(float(r.f1_macro_val_mean), 4),
+                "cv_f1_macro_std": round(float(r.f1_macro_val_std), 4),
+                "cv_accuracy": round(float(r.accuracy_val_mean), 4),
+                "train_f1_macro": round(float(r.f1_macro_train_mean), 4),
+                "flag": r.flag, "kwargs": KW.get(r.method, {})}
+
+    handoff = {
+        "best": entry(best),
+        "parsimonious": entry(near),
+        "note": (f"Chosen among runs NOT flagged overfit. kNN uses weights='distance', so its train score is always "
+                 f"1.0 and it is always flagged; the top run overall is {top_any['name']} "
+                 f"({top_any.f1_macro_val_mean:.4f}, flag={top_any.flag}). No reducer beats all 131 features "
+                 f"(best {none_best:.3f}); {best.method} keeps {best.f1_macro_val_mean / none_best:.0%} of that with "
+                 f"{int(best.dim)} dimensions instead of 131. Pipeline: impute -> scale -> ClipZ(5) -> "
+                 f"{best.method}({int(best.dim)}) -> classifier."),
+        "all_features_same_classifiers_cv_f1_macro": round(float(none_best), 4),
+        "usage": "from src.reduction import best_reducer; make_model(clf, params, reducer=best_reducer())",
+    }
+    (OUT / "best_reducer.json").write_text(json.dumps(handoff, indent=2) + "\n")
+    print(json.dumps(handoff, indent=2))
+    return handoff
 
 
 def main():
@@ -90,23 +130,7 @@ def main():
     tab = tab.sort_values("best_f1", ascending=False); tab.to_csv(OUT / "downstream_best_dim.csv")
     print(tab.round(3), flush=True)
 
-    # pick the hand-off reducer: best macro-F1 over reducers (excluding 'none'); report the gap to 'none'
-    red = df[df.method != "none"].sort_values("f1_macro_val_mean", ascending=False).iloc[0]
-    # parsimonious alternative: best reducer within 0.01 of the top with the smallest dim
-    near = df[(df.method != "none") & (df.f1_macro_val_mean >= red.f1_macro_val_mean - 0.01)].sort_values(["dim", "f1_macro_val_mean"], ascending=[True, False]).iloc[0]
-    none_best = df[df.method == "none"].f1_macro_val_mean.max()
-    handoff = {
-        "best": {"method": red.method, "n_components": float(0.95) if red.method == "PCA" else int(red.dim),
-                 "dim": int(red.dim), "classifier": red.clf, "cv_f1_macro": round(red.f1_macro_val_mean, 4),
-                 "cv_f1_macro_std": round(red.f1_macro_val_std, 4), "cv_accuracy": round(red.accuracy_val_mean, 4),
-                 "flag": red.flag, "kwargs": KW.get(red.method, {})},
-        "parsimonious": {"method": near.method, "dim": int(near.dim), "classifier": near.clf,
-                         "cv_f1_macro": round(near.f1_macro_val_mean, 4)},
-        "all_features_same_classifiers_cv_f1_macro": round(none_best, 4),
-        "usage": "from src.reduction import best_reducer; make_model(clf, params, reducer=best_reducer())",
-    }
-    (OUT / "best_reducer.json").write_text(json.dumps(handoff, indent=2))
-    print(json.dumps(handoff, indent=2))
+    write_handoff(df)
 
     # figures
     order = ["PCA", "SVD", "LDA", "KernelPCA_rbf", "KernelPCA_poly", "UMAP", "Isomap", "LLE", "LLE_modified"]
@@ -137,4 +161,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--handoff-only" in sys.argv:          # rebuild best_reducer.json from the existing CSV (no refit)
+        write_handoff(pd.read_csv(CSV))
+    else:
+        main()

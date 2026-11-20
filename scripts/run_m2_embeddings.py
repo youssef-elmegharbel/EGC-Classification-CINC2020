@@ -2,7 +2,7 @@
 training subsample, with clustering (k-means, GMM) and structure scores.
 
 Outputs: results/models/m2/{embeddings.parquet, embedding_scores.csv, pca_variance.csv,
-         pca_loadings.csv, lda_info.csv, svd_vs_pca.csv, sne_kl.csv, sweeps.csv}
+         pca_loadings.csv, svd_vs_pca.csv, sne_kl.csv, sweeps.csv}
          results/figures/20_*.png ... 29_*.png
 Run:  python scripts/run_m2_embeddings.py
 """

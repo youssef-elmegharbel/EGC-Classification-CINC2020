@@ -143,11 +143,11 @@ def make_reducer(name: str, n_components: int = 2, **kw):
     if name == "SVD":
         return TruncatedSVD(n_components=n_components, random_state=r)
     if name == "KernelPCA_rbf":
-        return KernelPCA(n_components=n_components, kernel="rbf", gamma=kw.get("gamma", 1 / 131),
+        return KernelPCA(n_components=n_components, kernel="rbf", gamma=kw.get("gamma"),
                          eigen_solver="randomized", random_state=r)
     if name == "KernelPCA_poly":
         return KernelPCA(n_components=n_components, kernel="poly", degree=kw.get("degree", 3),
-                         gamma=kw.get("gamma", 1 / 131), eigen_solver="randomized", random_state=r)
+                         gamma=kw.get("gamma"), eigen_solver="randomized", random_state=r)
     if name == "UMAP":
         return UnsupervisedUMAP(n_components=n_components, n_neighbors=kw.get("n_neighbors", 15),
                          min_dist=kw.get("min_dist", 0.1))
