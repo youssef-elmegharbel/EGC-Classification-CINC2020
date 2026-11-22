@@ -203,7 +203,7 @@ def select_chi2(task: Task) -> dict:
 # 2. WRAPPER methods
 # ---------------------------------------------------------------------------------------------
 def _greedy(task: Task, forward: bool, start: list[int] | None = None, tol: float = 5e-4, patience: int = 3,
-            max_k: int = 60, log=None) -> dict:
+            max_k: int = 60, log=None, chunk: int = 1, chunk_above: int = 40) -> dict:
     """Sequential forward (add best) / backward (drop least harmful) selection with early stopping:
     stop when the CV score has not improved on the best seen (by `tol`) for `patience` consecutive steps."""
     t0 = time.perf_counter()
@@ -221,7 +221,13 @@ def _greedy(task: Task, forward: bool, start: list[int] | None = None, tol: floa
         sets = [sorted(cur + [c]) if forward else sorted(set(cur) - {c}) for c in pool]
         res = _par_scores(task, sets)
         j = int(np.argmax([r[0] for r in res]))
-        cur = sets[j]
+        if not forward and chunk > 1 and len(cur) > chunk_above:
+            # large backward set: drop the `chunk` least useful features in one step (scored individually)
+            top = np.argsort([-r[0] for r in res])[:chunk]
+            cur = sorted(set(cur) - {pool[i] for i in top})
+            res[j] = _score_cols(task.fold_data, cur)
+        else:
+            cur = sets[j]
         path.append((len(cur), res[j][0], res[j][1], list(cur)))
         if res[j][0] > best + tol:
             best, stale = res[j][0], 0
@@ -242,10 +248,11 @@ def select_sfs(task: Task, log=None, **kw) -> dict:
 
 
 def select_sbs(task: Task, log=None, prune_thr: float = 0.95, **kw) -> dict:
-    """Backward elimination starting from the correlation-pruned set (|r| < 0.95): starting from all 131 highly
+    """Backward elimination (5 features per step while >40 remain, then 1) starting from the correlation-pruned set (|r| < 0.95): starting from all 131 highly
     redundant columns is 2-3x slower and the near-duplicates are removed first anyway."""
     sc = filter_scores(task)["anova_f"]
     start = [task.names.index(n) for n in correlation_prune(task.Z, task.names, sc, prune_thr)]
+    kw.setdefault("chunk", 5)
     return _greedy(task, False, start=start, log=log, **kw)
 
 
