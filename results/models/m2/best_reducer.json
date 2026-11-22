@@ -1,0 +1,29 @@
+{
+  "best": {
+    "method": "LDA",
+    "n_components": 5,
+    "dim": 5,
+    "classifier": "logreg",
+    "cv_f1_macro": 0.7628,
+    "cv_f1_macro_std": 0.0156,
+    "cv_accuracy": 0.793,
+    "train_f1_macro": 0.7921,
+    "flag": "ok",
+    "kwargs": {}
+  },
+  "parsimonious": {
+    "method": "LDA",
+    "n_components": 5,
+    "dim": 5,
+    "classifier": "logreg",
+    "cv_f1_macro": 0.7628,
+    "cv_f1_macro_std": 0.0156,
+    "cv_accuracy": 0.793,
+    "train_f1_macro": 0.7921,
+    "flag": "ok",
+    "kwargs": {}
+  },
+  "note": "Chosen among runs NOT flagged overfit. kNN uses weights='distance', so its train score is always 1.0 and it is always flagged; the top run overall is LDA|d=5|knn (0.7630, flag=overfit). No reducer beats all 131 features (best 0.786); LDA keeps 97% of that with 5 dimensions instead of 131. Pipeline: impute -> scale -> ClipZ(5) -> LDA(5) -> classifier.",
+  "all_features_same_classifiers_cv_f1_macro": 0.7855,
+  "usage": "from src.reduction import best_reducer; make_model(clf, params, reducer=best_reducer())"
+}
