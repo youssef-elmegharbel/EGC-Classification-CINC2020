@@ -67,7 +67,7 @@ def build() -> "Path":
     pc = pd.read_csv(MODELS_DIR / "per_class_final.csv", index_col=0)
     grid = pd.read_csv(MODELS_DIR / "grid_results_a.csv")
     vc = pd.read_csv(MODELS_DIR / "validation_curves.csv")
-    final = test.sort_values("cv_f1_macro", ascending=False).iloc[0]
+    final = test[test["name"].str.endswith("|a")].sort_values("cv_f1_macro", ascending=False).iloc[0]   # set (a) only
     import json
     n_tr = len(json.loads((DATA_DIR / "splits.json").read_text())["train_ids"])
     cls_n = labels["label"].value_counts()
