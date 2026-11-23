@@ -288,9 +288,47 @@ def build() -> "Path":
     if (FIG / "11_learning_knn.png").exists():
         _figure(doc, "11_learning_knn.png", "Learning curve of k-NN (set a), the most overfit model.", 4.5)
     doc.add_heading("8.4 Reduced and selected feature sets", 2)
+    names = {"logreg": "Logistic regression", "knn": "k-NN", "svm": "SVM (RBF)", "rf": "Random forest", "lgbm": "LightGBM", "mlp": "MLP"}
+    bb, bc = best_per_model("b").set_index("model"), best_per_model("c").set_index("model")
+    ba = best.assign(model=best["model"].astype(str)).set_index("model")
+    bb.index, bc.index = bb.index.astype(str), bc.index.astype(str)
+    ms = list(ba.index)
     doc.add_paragraph(
-        "[To be completed when M2's best reduced representation (set b) and M3's best selected subset (set c) are delivered. The experiment runs "
-        "through the same pipeline and evaluation code: python scripts/run_models.py c all r1 / r2, and the same notebook cells.]")
+        "The same six models, grids, folds and evaluation code were run on two further inputs. Set (b) is M2's best reduced representation: "
+        "impute, scale, clip at 5 standard deviations, then LDA with 5 components (selected by M2 with 5-fold CV among runs not flagged overfit). "
+        "Set (c) is M3's best selected subset: 59 of the 131 features chosen by RFECV with logistic regression. In both cases the reducer or selector "
+        "sits inside the Pipeline and is fit on training folds only. Hyperparameters were chosen by CV macro-F1, and each model was scored once on the test set.")
+    cmp_ = pd.DataFrame({
+        "Model": [names[m] for m in ms],
+        "CV F1 (a, 131)": [f"{ba.loc[m, 'f1_macro_val_mean']:.3f}" for m in ms],
+        "CV F1 (b, LDA-5)": [f"{bb.loc[m, 'f1_macro_val_mean']:.3f}" for m in ms],
+        "CV F1 (c, 59)": [f"{bc.loc[m, 'f1_macro_val_mean']:.3f}" for m in ms],
+        "Flag a/b/c": [f"{ba.loc[m, 'flag']}/{bb.loc[m, 'flag']}/{bc.loc[m, 'flag']}" for m in ms],
+        "Test F1 a": [f"{tt.loc[m + '|a', 'f1_macro']:.3f}" for m in ms],
+        "Test F1 b": [f"{tt.loc[m + '|b', 'f1_macro']:.3f}" for m in ms],
+        "Test F1 c": [f"{tt.loc[m + '|c', 'f1_macro']:.3f}" for m in ms],
+        "Test acc. a/b/c": [f"{tt.loc[m + '|a', 'accuracy']:.3f}/{tt.loc[m + '|b', 'accuracy']:.3f}/{tt.loc[m + '|c', 'accuracy']:.3f}" for m in ms]})
+    _table(doc, cmp_, "Best configuration per model on each feature set: 5-fold CV macro-F1, overfit flag (train - CV macro-F1 > 0.10) and one-time test scores.", font=7)
+    doc.add_paragraph(
+        "Neither reduction nor selection beats the full feature set for the best model. LightGBM on all features has CV macro-F1 0.796 and test macro-F1 0.803; "
+        "on the 59 selected features it reaches 0.793 and 0.796, a difference far smaller than the fold standard deviation (about 0.01), "
+        "so M3's subset keeps the accuracy with 45% of the features. LightGBM on the 5 LDA components drops to 0.761 CV and 0.763 test, because LDA is a linear, "
+        "supervised projection that discards non-linear structure that the boosted trees can use.")
+    doc.add_paragraph(
+        "Reduction helps the models that suffer in high dimensions. k-NN improves from CV 0.617 (test 0.613) on 131 features to 0.767 (test 0.767) on the LDA components, "
+        "and the SVM, MLP and logistic regression reach CV 0.763-0.768 with a small train-CV gap. "
+        "Four of six models are not flagged overfit on set (b) (logistic regression, SVM, LightGBM, MLP), against one of six on set (a); k-NN is flagged "
+        "only because distance weighting makes its training score exactly 1.0, and the random forest keeps a gap of about 0.16. "
+        "On set (c) the picture is close to set (a): only logistic regression is not flagged. For the weaker models, selection helps modestly "
+        "(logistic regression CV 0.762 -> 0.781, SVM 0.766 -> 0.780, MLP 0.764 -> 0.776), while the random forest is unchanged within noise. "
+        "No model is near the dummy baseline (macro-F1 0.166), so none underfits.")
+    doc.add_paragraph(
+        "Test scores agree with CV scores to within about 0.02 for every model and set, with the largest differences for the random forest on set (b) "
+        "(CV 0.763, test 0.777) and the MLP on set (b) (0.768, 0.778). The recommended final model therefore remains LightGBM on all features "
+        "(best test macro-F1 0.803); LightGBM on M3's 59 features is an equally accurate and cheaper alternative, and the LDA representation is the best choice "
+        "when a low-dimensional, less overfit input is wanted (for example for k-NN or for visualisation). "
+        "Set (c) CV scores are slightly optimistic because the subset was chosen on the same training data; M3's nested estimate for this subset with logistic regression "
+        "is 0.767, close to the 0.766 test score of logistic regression on set (c).")
     doc.add_heading("8.5 Limitations", 2)
     for t in [
         "No patient identifiers: recordings cannot be grouped by patient, so folds may contain several recordings of one patient, which would make scores slightly optimistic.",

@@ -1,6 +1,7 @@
 """Grid-search the 6 models on one feature set with the shared 5 folds. Resumable.
 
 usage: python scripts/run_models.py a            # all features
+       python scripts/run_models.py b            # M2's best reducer (results/models/m2/best_reducer.json), fit per fold
        python scripts/run_models.py c            # M3's list in results/data/selected_features.json
 Outputs: results/models/grid_results_<set>.csv (every grid point), results/models/model_comparison.csv (best per
 model), results/models/best_params.json, results/models/oof_<set>_<model>.parquet (pooled out-of-fold predictions).
@@ -21,6 +22,10 @@ only = sys.argv[2].split(",") if len(sys.argv) > 2 and sys.argv[2] != "all" else
 X, y, splits = load_task()
 Xtr, ytr = train_part(X, y, splits)
 selector = None
+reducer = None
+if fs == "b":
+    from src.reduction import best_reducer
+    reducer = best_reducer()  # unfitted; fitted inside each training fold by the Pipeline (no leakage)
 if fs == "c":
     selector = json.loads((DATA_DIR / "selected_features.json").read_text())["features"]
 bp_path = MODELS_DIR / "best_params.json"
@@ -41,7 +46,7 @@ for m in only:
         print("skip (done):", key, flush=True)
         continue
     print(f"== {key}", flush=True)
-    table, best = run_grid(m, Xtr, ytr, splits["folds"], fs, dummy_f1, selector=selector,
+    table, best = run_grid(m, Xtr, ytr, splits["folds"], fs, dummy_f1, selector=selector, reducer=reducer,
                            grid=GRIDS_R2[m] if rnd == "r2" else None,
                            log=lambda s: print(s, flush=True))
     for rec in table.assign(round=rnd).to_dict("records"):
