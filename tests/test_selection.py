@@ -72,3 +72,13 @@ def test_nested_uses_unseen_validation_rows(toy):
     finally:
         del S.METHODS["_t"]
     assert len(df) == len(task.folds) and (df.f1_macro > 0.5).all()
+
+
+@pytest.mark.parametrize("name", list(S.METHODS))
+def test_k_fixed_returns_exactly_k(toy, name):
+    """Every selection method must honour k_fixed so methods can be compared at the same subset size."""
+    task, *_ = toy
+    kw = {"wrapper_sfs": dict(), "wrapper_sbs": dict(), "meta_ga": dict(pop=12, ngen=4), "meta_pso": dict(n=10, iters=4),
+          "meta_gwo": dict(n=10, iters=4)}.get(name, {})
+    res = S.METHODS[name](task, k_fixed=6, **kw)
+    assert res["k"] == 6 and len(set(res["features"])) == 6 and set(res["features"]) <= set(task.names)

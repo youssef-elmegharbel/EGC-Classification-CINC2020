@@ -1,0 +1,17 @@
+method,family,k,select_time_s,search_cv_f1,cv_f1_logreg,flag_logreg,cv_f1_svm,flag_svm,cv_f1_lgbm,flag_lgbm
+embedded_elasticnet,embedded,65,223.1,0.7631,0.7631,ok,0.7728,overfit,0.7825,overfit
+embedded_l1,embedded,65,74.8,0.7635,0.7635,ok,0.7726,overfit,0.7808,overfit
+embedded_l2,embedded,65,42.4,0.7736,0.7736,ok,0.7726,overfit,0.7798,overfit
+embedded_rf,embedded,65,5.4,0.7628,0.7628,ok,0.7746,overfit,0.7741,overfit
+filter_anova,filter,65,7.0,0.7566,0.7566,ok,0.7654,overfit,0.7666,overfit
+filter_chi2,filter,65,5.0,0.7556,0.7556,ok,0.7647,overfit,0.7696,overfit
+filter_corr,filter,65,2.8,0.7566,0.7566,ok,0.7654,overfit,0.7666,overfit
+filter_mi,filter,65,5.1,0.749,0.749,ok,0.7576,overfit,0.7702,overfit
+filter_variance,filter,65,2.8,0.7444,0.7444,ok,0.7464,overfit,0.7676,overfit
+meta_ga,meta,65,228.2,0.7828,0.7828,ok,0.7709,overfit,0.7804,overfit
+meta_gwo,meta,65,97.7,0.7694,0.7694,ok,0.7714,overfit,0.7828,overfit
+meta_pso,meta,65,109.6,0.7635,0.7635,ok,0.7691,overfit,0.7705,overfit
+wrapper_rfecv_lgbm,wrapper,65,46.7,0.7674,0.7674,ok,0.7727,overfit,0.7777,overfit
+wrapper_rfecv_logreg,wrapper,65,2.8,0.7757,0.7757,ok,0.7794,overfit,0.7762,overfit
+wrapper_sbs,wrapper,65,302.1,0.779,0.779,ok,0.767,overfit,0.7812,overfit
+wrapper_sfs,wrapper,65,745.4,0.7774,0.7774,ok,0.7662,overfit,0.7781,overfit

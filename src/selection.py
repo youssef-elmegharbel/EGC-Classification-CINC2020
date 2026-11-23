@@ -17,7 +17,8 @@ Design rules (PHASE1_PLAN decisions 3, 7, 8):
 Filter rankings (variance, correlation, ANOVA, MI, chi2) are likewise computed on all training rows of the
   task; the nested CV repeats them inside each outer training fold, which measures the resulting selection bias.
 
-Every selector has the signature  fn(task) -> dict(features=[names], meta={...}).
+Every selector has the signature  fn(task, k_fixed=None) -> dict(features=[names], meta={...}).
+With `k_fixed=K` every method returns EXACTLY K features, so methods can be compared at equal subset size.
 """
 from __future__ import annotations
 
@@ -138,6 +139,15 @@ def choose_k(task: Task, ranking: list[int], ks=K_GRID) -> tuple[int, pd.DataFra
     return int(curve.k[pick]), curve
 
 
+def _cut_ranking(task: Task, ranking: list[int], k_fixed: int | None):
+    """Choose the cut of a ranking: CV curve + 1-SE rule, or exactly `k_fixed` features if given.
+    Returns (k, curve); the curve is always computed so plots keep working."""
+    k, curve = choose_k(task, ranking)
+    if k_fixed is not None:
+        k = min(int(k_fixed), len(ranking))
+    return k, curve
+
+
 # ---------------------------------------------------------------------------------------------
 # 1. FILTER methods
 # ---------------------------------------------------------------------------------------------
@@ -167,50 +177,58 @@ def correlation_prune(Z: np.ndarray, names: list[str], priority: pd.Series, thr:
     return [names[i] for i in sorted(kept)]
 
 
-def select_variance(task: Task, thr: float = 0.02) -> dict:
+def select_variance(task: Task, thr: float = 0.02, k_fixed: int | None = None) -> dict:
     t0 = time.perf_counter()
     sc = filter_scores(task)
     keep = sc.index[sc.var_minmax > thr]
+    if k_fixed is not None:                                   # the k highest-variance features
+        keep = sc.var_minmax.sort_values(ascending=False).index[:k_fixed]
     return _result(task, task.cols(keep), t0, threshold=thr, removed=[n for n in task.names if n not in set(keep)])
 
 
-def select_corr(task: Task, thr: float = 0.95) -> dict:
+def select_corr(task: Task, thr: float = 0.95, k_fixed: int | None = None) -> dict:
     t0 = time.perf_counter()
     sc = filter_scores(task)
     keep = correlation_prune(task.Z, task.names, sc["anova_f"], thr)
+    if k_fixed is not None:                                   # de-correlated set, then the k best by ANOVA F
+        keep = sc.anova_f[keep].sort_values(ascending=False).index[:k_fixed]
     return _result(task, task.cols(keep), t0, threshold=thr)
 
 
-def _select_ranked(task: Task, score_name: str, tag: str, prune: bool = True) -> dict:
+def _select_ranked(task: Task, score_name: str, tag: str, prune: bool = True, k_fixed: int | None = None) -> dict:
     t0 = time.perf_counter()
     sc = filter_scores(task)[score_name]
     cand = correlation_prune(task.Z, task.names, sc, 0.95) if prune else task.names
     rank = [task.names.index(n) for n in sc[cand].sort_values(ascending=False).index]
     k, curve = choose_k(task, rank, [x for x in K_GRID if x <= len(rank)])
+    if k_fixed is not None:
+        k = min(int(k_fixed), len(rank))
     return _result(task, rank[:k], t0, score=score_name, curve=curve.to_dict("list"), ranking=[task.names[i] for i in rank])
 
 
-def select_anova(task: Task) -> dict:
-    return _select_ranked(task, "anova_f", "ANOVA")
+def select_anova(task: Task, k_fixed: int | None = None) -> dict:
+    return _select_ranked(task, "anova_f", "ANOVA", k_fixed=k_fixed)
 
 
-def select_mi(task: Task) -> dict:
-    return _select_ranked(task, "mutual_info", "MI")
+def select_mi(task: Task, k_fixed: int | None = None) -> dict:
+    return _select_ranked(task, "mutual_info", "MI", k_fixed=k_fixed)
 
 
-def select_chi2(task: Task) -> dict:
-    return _select_ranked(task, "chi2", "chi2")
+def select_chi2(task: Task, k_fixed: int | None = None) -> dict:
+    return _select_ranked(task, "chi2", "chi2", k_fixed=k_fixed)
 
 
 # ---------------------------------------------------------------------------------------------
 # 2. WRAPPER methods
 # ---------------------------------------------------------------------------------------------
 def _greedy(task: Task, forward: bool, start: list[int] | None = None, tol: float = 5e-4, patience: int = 3,
-            max_k: int = 60, log=None, chunk: int = 1, chunk_above: int = 40) -> dict:
+            max_k: int = 60, log=None, chunk: int = 1, chunk_above: int = 40, k_fixed: int | None = None) -> dict:
     """Sequential forward (add best) / backward (drop least harmful) selection with early stopping:
     stop when the CV score has not improved on the best seen (by `tol`) for `patience` consecutive steps."""
     t0 = time.perf_counter()
     p = task.p
+    if k_fixed is not None:                              # run exactly to k_fixed features, no early stopping
+        patience, max_k = 10 ** 9, k_fixed
     cur = [] if forward else list(range(p) if start is None else start)
     path = []                                           # (size, mean, std, subset)
     best, stale = -np.inf, 0
@@ -219,12 +237,12 @@ def _greedy(task: Task, forward: bool, start: list[int] | None = None, tol: floa
         path.append((len(cur), m, s, list(cur))); best = m
     while True:
         pool = [c for c in range(p) if c not in cur] if forward else list(cur)
-        if (forward and len(cur) >= max_k) or (not forward and len(cur) <= 2) or not pool:
+        if (forward and len(cur) >= max_k) or (not forward and len(cur) <= max(2, k_fixed or 0)) or not pool:
             break
         sets = [sorted(cur + [c]) if forward else sorted(set(cur) - {c}) for c in pool]
         res = _par_scores(task, sets)
         j = int(np.argmax([r[0] for r in res]))
-        if not forward and chunk > 1 and len(cur) > chunk_above:
+        if not forward and chunk > 1 and len(cur) > chunk_above and len(cur) - chunk >= (k_fixed or 0):
             # large backward set: drop the `chunk` least useful features in one step (scored individually)
             top = np.argsort([-r[0] for r in res])[:chunk]
             cur = sorted(set(cur) - {pool[i] for i in top})
@@ -241,6 +259,10 @@ def _greedy(task: Task, forward: bool, start: list[int] | None = None, tol: floa
         if stale >= patience:
             break
     sizes = [x[0] for x in path]
+    if k_fixed is not None:                              # the path entry of size k_fixed (or the closest one)
+        pick = int(np.argmin([abs(sz - k_fixed) for sz in sizes]))
+        return _result(task, path[pick][3], t0, steps=[{"k": a, "cv_f1": b, "cv_std": c} for a, b, c, _ in path],
+                       direction="forward" if forward else "backward", k_fixed=k_fixed)
     pick = one_se_pick([x[1] for x in path], [x[2] for x in path], sizes, len(task.fold_data))
     return _result(task, path[pick][3], t0, steps=[{"k": a, "cv_f1": b, "cv_std": c} for a, b, c, _ in path],
                    direction="forward" if forward else "backward")
@@ -259,7 +281,7 @@ def select_sbs(task: Task, log=None, prune_thr: float = 0.95, **kw) -> dict:
     return _greedy(task, False, start=start, log=log, **kw)
 
 
-def select_rfecv(task: Task, estimator: str = "logreg") -> dict:
+def select_rfecv(task: Task, estimator: str = "logreg", k_fixed: int | None = None) -> dict:
     """Recursive feature elimination with CV-chosen size (RFECV) on the shared folds. For stability and
     speed the imputation/scaling statistics come from the whole training part (label-free; the nested CV in
     `nested_score` re-runs it per outer fold, which covers the small leak)."""
@@ -271,6 +293,10 @@ def select_rfecv(task: Task, estimator: str = "logreg") -> dict:
         est = lgb.LGBMClassifier(n_estimators=120, num_leaves=15, learning_rate=0.1, subsample=0.8, subsample_freq=1,
                                  colsample_bytree=0.8, class_weight="balanced", random_state=SEED, n_jobs=1, verbose=-1)
         step = 5
+    if k_fixed is not None:                                   # plain RFE down to exactly k_fixed features
+        from sklearn.feature_selection import RFE
+        sel = RFE(est, n_features_to_select=k_fixed, step=step).fit(task.Z, task.y.to_numpy())
+        return _result(task, np.where(sel.support_)[0], t0, estimator=estimator, k_fixed=k_fixed)
     sel = RFECV(est, step=step, cv=task.pos_folds, scoring="f1_macro", min_features_to_select=3, n_jobs=N_JOBS)
     sel.fit(task.Z, task.y.to_numpy())
     cv = sel.cv_results_
@@ -279,8 +305,8 @@ def select_rfecv(task: Task, estimator: str = "logreg") -> dict:
                           "step": step, "n_features_total": task.p})
 
 
-def select_rfecv_lgbm(task: Task) -> dict:
-    return select_rfecv(task, "lgbm")
+def select_rfecv_lgbm(task: Task, k_fixed: int | None = None) -> dict:
+    return select_rfecv(task, "lgbm", k_fixed=k_fixed)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -320,15 +346,39 @@ def _embedded_from_path(task, path: pd.DataFrame, t0, l1_ratio):
                    path=path.drop(columns=["_support", "_absw"]).to_dict("list"))
 
 
-def select_l1(task: Task) -> dict:
+def _embedded_fixed(task: Task, path: pd.DataFrame, k: int):
+    """Sparsest C that still has >= k non-zero coefficients (else the weakest penalty), then the k features with
+    the largest mean |coef|. Returns (cols, C)."""
+    ok = path.index[path.n_nonzero >= k]
+    i = int(path.loc[ok, "n_nonzero"].idxmin()) if len(ok) else int(path.n_nonzero.idxmax())
+    w = path._absw[i]
+    sup = path._support[i]
+    cols = sup[np.argsort(-w[sup])][:k] if len(sup) >= k else np.argsort(-w)[:k]
+    return cols, float(path.C[i])
+
+
+def select_l1(task: Task, k_fixed: int | None = None) -> dict:
     t0 = time.perf_counter()
-    return _embedded_from_path(task, regularisation_path(task, 1.0), t0, 1.0)
+    path = regularisation_path(task, 1.0)
+    if k_fixed is not None:
+        cols, C = _embedded_fixed(task, path, k_fixed)
+        return _result(task, cols, t0, l1_ratio=1.0, C=C, k_fixed=k_fixed,
+                       path=path.drop(columns=["_support", "_absw"]).to_dict("list"))
+    return _embedded_from_path(task, path, t0, 1.0)
 
 
-def select_elasticnet(task: Task, ratios=(0.25, 0.5, 0.75)) -> dict:
+def select_elasticnet(task: Task, ratios=(0.25, 0.5, 0.75), k_fixed: int | None = None) -> dict:
     """Grid over (l1_ratio, C); keep the sparsest model within one SE of the best CV macro-F1."""
     t0 = time.perf_counter()
     paths = {r: regularisation_path(task, r) for r in ratios}
+    if k_fixed is not None:                              # per ratio: top-k at the sparsest C with >= k; keep best CV
+        cands = {}
+        for r in ratios:
+            cols, C = _embedded_fixed(task, paths[r], k_fixed)
+            cands[r] = (cols, C, S_mean(task, cols))
+        r = max(cands, key=lambda q: cands[q][2])
+        return _result(task, cands[r][0], t0, l1_ratio=r, C=cands[r][1], k_fixed=k_fixed,
+                       grid={str(rr): paths[rr].drop(columns=["_support", "_absw"]).to_dict("list") for rr in ratios})
     rows = [(r, i) for r in ratios for i in range(len(C_GRID))]
     means = [paths[r].cv_f1[i] for r, i in rows]
     stds = [paths[r].cv_std[i] for r, i in rows]
@@ -338,7 +388,11 @@ def select_elasticnet(task: Task, ratios=(0.25, 0.5, 0.75)) -> dict:
                    grid={str(rr): paths[rr].drop(columns=["_support", "_absw"]).to_dict("list") for rr in ratios})
 
 
-def select_l2(task: Task) -> dict:
+def S_mean(task: Task, cols) -> float:
+    return float(fold_scores(task.fold_data, cols).mean())
+
+
+def select_l2(task: Task, k_fixed: int | None = None) -> dict:
     """L2 never zeroes a coefficient, so rank features by mean |coef| (standardised inputs) at the CV-best C and
     cut the ranking with the CV curve (1-SE rule)."""
     t0 = time.perf_counter()
@@ -346,12 +400,12 @@ def select_l2(task: Task) -> dict:
     b = int(path.cv_f1.idxmax())
     w = path._absw[b]
     rank = list(np.argsort(-w))
-    k, curve = choose_k(task, rank)
+    k, curve = _cut_ranking(task, rank, k_fixed)
     return _result(task, rank[:k], t0, C=float(path.C[b]), curve=curve.to_dict("list"),
                    ranking=[task.names[i] for i in rank], weights=[float(w[i]) for i in rank])
 
 
-def select_tree_importance(task: Task, kind: str = "rf") -> dict:
+def select_tree_importance(task: Task, kind: str = "rf", k_fixed: int | None = None) -> dict:
     """Bonus embedded view: impurity importance of a random forest, cut with the CV curve."""
     t0 = time.perf_counter()
     from sklearn.ensemble import RandomForestClassifier
@@ -359,7 +413,7 @@ def select_tree_importance(task: Task, kind: str = "rf") -> dict:
                                 n_jobs=N_JOBS, random_state=SEED).fit(task.Z, task.y.to_numpy())
     imp = rf.feature_importances_
     rank = list(np.argsort(-imp))
-    k, curve = choose_k(task, rank)
+    k, curve = _cut_ranking(task, rank, k_fixed)
     return _result(task, rank[:k], t0, curve=curve.to_dict("list"),
                    ranking=[task.names[i] for i in rank], weights=[float(imp[i]) for i in rank])
 
@@ -404,7 +458,8 @@ def _history_row(gen, fits, masks, best):
 
 
 def select_ga(task: Task, pop: int = 40, ngen: int = 40, patience: int = 8, cxpb: float = 0.7, mutpb: float = 0.4,
-              indpb: float = 0.03, init_p: float = 0.15, lam: float = LAMBDA, seed: int = SEED, log=None) -> dict:
+              indpb: float = 0.03, init_p: float = 0.15, lam: float = LAMBDA, seed: int = SEED, log=None,
+              k_fixed: int | None = None) -> dict:
     """Genetic algorithm (DEAP): binary chromosome of length p, fitness = CV macro-F1 - lam * k/p,
     tournament selection (size 3), two-point crossover, bit-flip mutation, elitism via a hall of fame.
     Stops after `patience` generations without improvement of the best fitness."""
@@ -413,12 +468,18 @@ def select_ga(task: Task, pop: int = 40, ngen: int = 40, patience: int = 8, cxpb
 
     t0 = time.perf_counter()
     random.seed(seed); np.random.seed(seed)
+    rng_fix = np.random.default_rng(seed)
+    if k_fixed is not None:
+        lam = 0.0                                          # size is fixed, no size penalty needed
     if not hasattr(creator, "FitnessMaxM3"):
         creator.create("FitnessMaxM3", base.Fitness, weights=(1.0,))
         creator.create("IndividualM3", list, fitness=creator.FitnessMaxM3)
     tb = base.Toolbox()
     tb.register("attr", lambda: int(random.random() < init_p))
-    tb.register("individual", tools.initRepeat, creator.IndividualM3, tb.attr, n=task.p)
+    if k_fixed is None:
+        tb.register("individual", tools.initRepeat, creator.IndividualM3, tb.attr, n=task.p)
+    else:
+        tb.register("individual", lambda: creator.IndividualM3(_rand_masks(1, task.p, k_fixed, rng_fix)[0].tolist()))
     tb.register("population", tools.initRepeat, list, tb.individual)
     tb.register("select", tools.selTournament, tournsize=3)
     tb.register("mate", tools.cxTwoPoint)
@@ -446,6 +507,9 @@ def select_ga(task: Task, pop: int = 40, ngen: int = 40, patience: int = 8, cxpb
             if random.random() < mutpb:
                 tb.mutate(m); del m.fitness.values
         inv = [i for i in off if not i.fitness.valid]
+        if k_fixed is not None:
+            for i in inv:
+                _repair(i, k_fixed, rng_fix)
         evaluate(inv)
         popn = off + [tb.clone(hof[0])]                     # elitism
         res = [(i.fitness.values[0], 0) for i in popn]
@@ -465,20 +529,50 @@ def select_ga(task: Task, pop: int = 40, ngen: int = 40, patience: int = 8, cxpb
                    cv_f1=ev([mask])[0][1], stopped_gen=len(hist) - 1)
 
 
+def _rand_masks(n: int, p: int, k: int, rng) -> np.ndarray:
+    """n random binary masks with exactly k ones."""
+    X = np.zeros((n, p), dtype=int)
+    for i in range(n):
+        X[i, rng.choice(p, k, replace=False)] = 1
+    return X
+
+
+def _topk_masks(score: np.ndarray, k: int) -> np.ndarray:
+    """Binary masks keeping the k largest entries of every row of `score`."""
+    idx = np.argpartition(-score, k - 1, axis=1)[:, :k]
+    X = np.zeros(score.shape, dtype=int)
+    np.put_along_axis(X, idx, 1, axis=1)
+    return X
+
+
+def _repair(ind, k: int, rng) -> None:
+    """In place: make the 0/1 list `ind` hold exactly k ones (drop / add random bits)."""
+    ones = [i for i, b in enumerate(ind) if b]
+    zeros = [i for i, b in enumerate(ind) if not b]
+    if len(ones) > k:
+        for i in rng.choice(ones, len(ones) - k, replace=False):
+            ind[int(i)] = 0
+    elif len(ones) < k:
+        for i in rng.choice(zeros, k - len(ones), replace=False):
+            ind[int(i)] = 1
+
+
 def _sigmoid(x):
     return 1.0 / (1.0 + np.exp(-np.clip(x, -30, 30)))
 
 
 def select_pso(task: Task, n: int = 30, iters: int = 40, patience: int = 8, w_hi: float = 0.9, w_lo: float = 0.4,
                c1: float = 1.5, c2: float = 1.5, vmax: float = 4.0, init_p: float = 0.15, lam: float = LAMBDA,
-               seed: int = SEED, log=None) -> dict:
+               seed: int = SEED, log=None, k_fixed: int | None = None) -> dict:
     """Binary PSO (Kennedy & Eberhart 1997): velocity update as in continuous PSO with inertia decreasing
     from w_hi to w_lo; bit i is set with probability sigmoid(v_i)."""
     t0 = time.perf_counter()
     rng = np.random.default_rng(seed)
     p = task.p
+    if k_fixed is not None:
+        lam = 0.0
     ev = _Evaluator(task, lam)
-    X = (rng.random((n, p)) < init_p).astype(int)
+    X = (rng.random((n, p)) < init_p).astype(int) if k_fixed is None else _rand_masks(n, p, k_fixed, rng)
     V = rng.uniform(-1, 1, (n, p))
     fit = np.array([r[0] for r in ev(list(X))])
     pbest, pfit = X.copy(), fit.copy()
@@ -488,8 +582,11 @@ def select_pso(task: Task, n: int = 30, iters: int = 40, patience: int = 8, w_hi
         w = w_hi - (w_hi - w_lo) * it / iters
         V = w * V + c1 * rng.random((n, p)) * (pbest - X) + c2 * rng.random((n, p)) * (gbest - X)
         V = np.clip(V, -vmax, vmax)
-        X = (rng.random((n, p)) < _sigmoid(V)).astype(int)
-        X[X.sum(1) == 0, rng.integers(p)] = 1
+        if k_fixed is None:
+            X = (rng.random((n, p)) < _sigmoid(V)).astype(int)
+            X[X.sum(1) == 0, rng.integers(p)] = 1
+        else:                                              # stochastic top-k of sigmoid(V)
+            X = _topk_masks(_sigmoid(V) * rng.random((n, p)), k_fixed)
         fit = np.array([r[0] for r in ev(list(X))])
         imp = fit > pfit
         pbest[imp], pfit[imp] = X[imp], fit[imp]
@@ -510,7 +607,7 @@ def select_pso(task: Task, n: int = 30, iters: int = 40, patience: int = 8, w_hi
 
 
 def select_gwo(task: Task, n: int = 30, iters: int = 40, patience: int = 8, init_p: float = 0.15,
-               lam: float = LAMBDA, seed: int = SEED, log=None) -> dict:
+               lam: float = LAMBDA, seed: int = SEED, log=None, k_fixed: int | None = None) -> dict:
     """Binary Grey Wolf Optimizer (after Emary et al. 2016): the three best wolves (alpha, beta, delta) guide the
     pack; each leader proposes a bit vector from a sigmoid-squashed step, and the new position is sampled from the
     average of the three proposals. NOTE: this is a simplified variant -- the crossover step of Emary et al. is
@@ -519,7 +616,10 @@ def select_gwo(task: Task, n: int = 30, iters: int = 40, patience: int = 8, init
     rng = np.random.default_rng(seed)
     p = task.p
     ev = _Evaluator(task, lam)
-    X = (rng.random((n, p)) < init_p).astype(int)
+    if k_fixed is not None:
+        lam = 0.0
+        ev = _Evaluator(task, lam)
+    X = (rng.random((n, p)) < init_p).astype(int) if k_fixed is None else _rand_masks(n, p, k_fixed, rng)
     fit = np.array([r[0] for r in ev(list(X))])
     order = np.argsort(-fit)
     lead = [X[order[i]].copy() for i in range(3)]; lfit = [fit[order[i]] for i in range(3)]
@@ -534,8 +634,11 @@ def select_gwo(task: Task, n: int = 30, iters: int = 40, patience: int = 8, init
             bstep = (_sigmoid(10 * (A * D - 0.5)) >= rng.random((n, p))).astype(int)
             props.append(((L + bstep) >= 1).astype(int))
         prob = sum(props) / 3.0
-        X = (rng.random((n, p)) < prob).astype(int)
-        X[X.sum(1) == 0, rng.integers(p)] = 1
+        if k_fixed is None:
+            X = (rng.random((n, p)) < prob).astype(int)
+            X[X.sum(1) == 0, rng.integers(p)] = 1
+        else:
+            X = _topk_masks(prob * rng.random((n, p)), k_fixed)
         fit = np.array([r[0] for r in ev(list(X))])
         allX = np.vstack([X] + [l[None] for l in lead]); allf = np.concatenate([fit, lfit])
         top = np.argsort(-allf)[:3]
@@ -577,13 +680,15 @@ NESTED_KW = {"wrapper_sfs": dict(max_k=30, tol=1e-3, patience=2), "wrapper_sbs":
 
 
 def nested_score(name: str, X: pd.DataFrame, y: pd.Series, outer_folds: list[dict], inner_splits: int = 3,
-                 log=print) -> pd.DataFrame:
+                 log=print, k_fixed: int | None = None) -> pd.DataFrame:
     """Selection bias check. For each outer fold: run the complete selection procedure `name` on the outer
     TRAINING rows (own inner folds), then fit logistic regression on those rows with the chosen features and score
     it on the outer validation rows, which the search never saw. Returns one row per outer fold."""
     rows = []
     fn = METHODS[name]
-    kw = NESTED_KW.get(name, {})
+    kw = dict(NESTED_KW.get(name, {}))
+    if k_fixed is not None:
+        kw["k_fixed"] = k_fixed                       # wrappers ignore max_k / patience when k_fixed is set
     for i, f in enumerate(outer_folds):
         Xa, ya = X.loc[f["train_ids"]], y.loc[f["train_ids"]]
         Xb, yb = X.loc[f["val_ids"]], y.loc[f["val_ids"]]
