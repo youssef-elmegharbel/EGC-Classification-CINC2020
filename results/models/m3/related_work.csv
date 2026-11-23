@@ -1,0 +1,9 @@
+Work,Data,Method,Classes,Metric,Reported score
+"Natarajan et al., CinC 2020 (1st place)",PhysioNet/CinC 2020 (hidden test set),"Wide (hand-crafted, RF-selected) + deep (CNN + Transformer)",27,Challenge score (generalised weighted accuracy),0.533
+"Wong et al., CinC 2020 (arXiv 2010.13712)",PhysioNet/CinC 2020 (hidden test set),Hand-crafted features + gradient-boosted trees,27,Challenge score,-0.080 (rank 36/41; validation 0.476)
+"Chen et al., iScience 2020","CPSC 2018 (6,877 records, hidden test)",CNN + RNN (challenge winner),9,Mean F1,0.84 (0.837)
+"Ribeiro et al., Nat. Commun. 2020","CODE, 2.3 M ECGs (Brazil)",Residual 1-D CNN,6,F1 / specificity,"F1 > 0.80, specificity > 0.99 per class"
+"Strodthoff et al., IEEE JBHI 2021","PTB-XL (21,837 records)",xresnet1d101 / Inception-1D benchmarks,71,Macro AUC,"0.925 (PTB-XL benchmark, all-statements task)"
+"Hannun et al., Nat. Med. 2019","Single-lead ambulatory ECGs (53,877 patients)",34-layer 1-D CNN,12,Mean F1 / AUC,F1 0.837 / AUC 0.97 (cardiologists F1 0.780)
+This work (M1 final model),"CinC 2020 subset (6,541 single-diagnosis records)",131 hand-crafted features + lgbm,6,Macro-F1 (5-fold CV / 20% test),0.796 / 0.803
+This work (M3 selected subset),same,59 selected features (RFECV (LogReg)) + lgbm (CV only),6,Macro-F1 (5-fold CV),0.775
