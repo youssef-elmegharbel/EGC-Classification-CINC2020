@@ -26,14 +26,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import pandas as pd                                                           # noqa: E402
 from src import selection as S                                                # noqa: E402
-from src.evaluate import append_result, cv_evaluate, load_task, summary_columns, train_part  # noqa: E402
+from src.evaluate import append_result, cv_evaluate, dummy_baseline, load_task, summary_columns, train_part  # noqa: E402
 from src.loaders import MODELS_DIR                                            # noqa: E402
 from src.models import make_model                                             # noqa: E402
 
 OUT = MODELS_DIR / "m3"
 (OUT / "subsets").mkdir(parents=True, exist_ok=True)
 (OUT / "nested").mkdir(parents=True, exist_ok=True)
-DUMMY_F1 = 0.166
 
 
 def log(*a):
@@ -45,6 +44,8 @@ def main():
     only = sys.argv[2:] or list(S.METHODS)
     X, y, splits = load_task()
     Xtr, ytr = train_part(X, y, splits)
+    # chance-level macro-F1 of the stratified-random dummy on the shared folds (used to flag under/over-fit)
+    DUMMY_F1 = float(dummy_baseline(Xtr, ytr, splits["folds"])[0]["f1_macro_val_mean"])
     if stage == "select":
         task = S.Task(Xtr, ytr, splits["folds"])
         for name in only:
@@ -58,7 +59,7 @@ def main():
             except Exception as e:                                             # keep going, report at the end
                 log("FAILED", name, repr(e)); continue
             res["method"], res["family"] = name, S.FAMILY[name]
-            f.write_text(json.dumps(res, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)))
+            f.write_text(json.dumps(res, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)) + "\n")
             log(f"  -> {name}: k={res['k']} in {res['time_s']:.0f}s")
     elif stage == "nested":
         for name in only:

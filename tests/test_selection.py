@@ -28,7 +28,23 @@ def test_one_se_prefers_smaller_model():
 def test_fold_preprocessing_is_per_fold(toy):
     task, *_ = toy
     Xa, ya, Xb, yb = task.fold_data[0]
-    assert abs(Xa.mean()) < 1e-9 and abs(Xb.mean()) > 0 and not np.isnan(Xb).any()   # scaler fit on train rows only
+    assert abs(Xa.mean()) < 1e-9 and not np.isnan(Xb).any()
+    # Xb must equal the validation rows transformed with the TRAINING rows' median / mean / sd
+    f = task.folds[0]
+    tr, va = task.X.loc[f["train_ids"]], task.X.loc[f["val_ids"]]
+    imp = tr.median()
+    tr_i, va_i = tr.fillna(imp), va.fillna(imp)
+    expected = (va_i - tr_i.mean()) / tr_i.std(ddof=0)
+    np.testing.assert_allclose(Xb, expected.to_numpy(), atol=1e-8)
+
+
+def test_l1_and_elasticnet_are_really_sparse(toy):
+    """Guards against sklearn versions where l1_ratio is silently ignored (L1 behaving like L2)."""
+    task, *_ = toy
+    m = S._penalised(1.0, 0.05).fit(task.Z, task.y.to_numpy())
+    assert (np.abs(m.coef_).max(axis=0) > 0).sum() < task.p
+    m2 = S._penalised(0.5, 0.05).fit(task.Z, task.y.to_numpy())
+    assert (np.abs(m2.coef_).max(axis=0) > 0).sum() < task.p
 
 
 def test_filters_find_informative_and_prune_duplicates(toy):

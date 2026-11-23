@@ -117,7 +117,7 @@ def comparison(subs):
         r = {"method": name, "family": s["family"], "label": LABEL[name], "k": s["k"], "time_s": round(s["time_s"], 1)}
         nf = OUT / "nested" / f"{name}.csv"
         if nf.exists():
-            n = pd.read_csv(nf); r.update(nested_f1=n.f1_macro.mean(), nested_std=n.f1_macro.std(ddof=1), nested_k=n.k.mean(),
+            n = pd.read_csv(nf); r.update(nested_f1=n.f1_macro.mean(), nested_std=n.f1_macro.std(ddof=1), nested_k=n.k.mean(), n_outer=len(n),
                                           nested_acc=n.accuracy.mean(), nested_time_s=n.time_s.sum(),
                                           stability_jaccard=np.mean([S.jaccard(json.loads(a), json.loads(b)) for a, b in combinations(n.features, 2)]))
         if cv is not None:
@@ -142,13 +142,17 @@ def fig_compare(df, base):
     fig, ax = plt.subplots(1, 2, figsize=(14, 5.5), gridspec_kw={"width_ratios": [3, 2]})
     y = np.arange(len(d))
     ax[0].barh(y, d.nested_f1, xerr=d.nested_std, color=[FAM_COL[f] for f in d.family], alpha=0.9, capsize=2)
-    ax[0].axvline(base, color="k", ls="--", lw=1, label=f"all 131 features ({base:.3f})")
+    if base is not None:
+        ax[0].axvline(base, color="k", ls="--", lw=1, label=f"all 131 features ({base:.3f})")
     ax[0].set_yticks(y, [f"{l}  (k≈{k:.0f})" for l, k in zip(d.label, d.nested_k)]); ax[0].invert_yaxis(); ax[0].set_xlim(0.5, max(0.82, d.nested_f1.max() + 0.03))
-    ax[0].set(xlabel="NESTED 5-fold macro-F1 (selection repeated inside each training fold)", title="Unbiased performance of each selection procedure"); ax[0].legend(loc="lower right")
+    ax[0].set(xlabel="NESTED 5-fold macro-F1 (selection repeated inside each training fold)", title="Unbiased performance of each selection procedure")
+    if base is not None: ax[0].legend(loc="lower right")
     for f, c in FAM_COL.items():
         s = d[d.family == f]; ax[1].scatter(s.nested_k, s.nested_f1, s=70, color=c, label=f)
     for _, r in d.iterrows(): ax[1].annotate(r.label, (r.nested_k, r.nested_f1), fontsize=6, xytext=(3, 3), textcoords="offset points")
-    ax[1].axhline(base, color="k", ls="--", lw=1); ax[1].set(xlabel="mean #features chosen", ylabel="nested macro-F1", title="Accuracy vs parsimony"); ax[1].legend()
+    if base is not None:
+        ax[1].axhline(base, color="k", ls="--", lw=1)
+    ax[1].set(xlabel="mean #features chosen", ylabel="nested macro-F1", title="Accuracy vs parsimony"); ax[1].legend()
     fig.tight_layout(); save(fig, "36_method_comparison.png")
 
 
@@ -174,15 +178,16 @@ def fig_overlap(subs, X):
 def choose_final(df, subs):
     """Highest nested macro-F1; among methods within one standard error of it, the one with fewest features."""
     d = df.dropna(subset=["nested_f1"]); b = d.nested_f1.idxmax()
-    thr = d.nested_f1[b] - d.nested_std[b] / np.sqrt(5)
+    thr = d.nested_f1[b] - d.nested_std[b] / np.sqrt(d.n_outer[b])
     cand = d[d.nested_f1 >= thr].sort_values(["k", "nested_f1"], ascending=[True, False])
     pick = cand.iloc[0]
     s = subs[pick.method]
     out = {"method": pick.method, "label": pick.label, "k": s["k"], "features": s["features"],
            "nested_cv_f1_macro": round(float(pick.nested_f1), 4), "nested_std": round(float(pick.nested_std), 4),
+           "note": "selection-adjusted: the method was chosen by its nested F1, so this number is slightly optimistic; confirm on CV of the final subset / another split",
            "rule": "highest nested 5-fold macro-F1; among methods within 1 SE of the best, the fewest features",
            "fit_on": "training 80% only (never the test set)"}
-    (DATA_DIR / "selected_features.json").write_text(json.dumps(out, indent=1))
+    (DATA_DIR / "selected_features.json").write_text(json.dumps(out, indent=1) + "\n")
     return out, cand
 
 
@@ -211,8 +216,7 @@ def main():
     base = df.attrs.get("all131_logreg")
     vdf = fig_overlap(subs, X)
     if "nested_f1" in df:
-        base_nested = base
-        fig_compare(df, base_nested if base_nested else 0.76)
+        fig_compare(df, base)
         out, cand = choose_final(df, subs); print("FINAL:", out["method"], out["k"], out["nested_cv_f1_macro"])
     df.round(4).to_csv(OUT / "comparison.csv", index=False)
     t = pd.read_csv(MODELS_DIR / "test_results.csv").sort_values("cv_f1_macro", ascending=False).iloc[0]

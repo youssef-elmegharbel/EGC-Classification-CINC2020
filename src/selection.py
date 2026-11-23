@@ -14,6 +14,9 @@ Design rules (PHASE1_PLAN decisions 3, 7, 8):
   `nested_score` re-runs the WHOLE selection procedure inside each outer training fold (with its own inner
   folds) and scores the chosen subset on the untouched outer validation fold.
 
+Filter rankings (variance, correlation, ANOVA, MI, chi2) are likewise computed on all training rows of the
+  task; the nested CV repeats them inside each outer training fold, which measures the resulting selection bias.
+
 Every selector has the signature  fn(task) -> dict(features=[names], meta={...}).
 """
 from __future__ import annotations
@@ -258,7 +261,8 @@ def select_sbs(task: Task, log=None, prune_thr: float = 0.95, **kw) -> dict:
 
 def select_rfecv(task: Task, estimator: str = "logreg") -> dict:
     """Recursive feature elimination with CV-chosen size (RFECV) on the shared folds. For stability and
-    speed the imputation/scaling statistics come from the whole training part (label-free)."""
+    speed the imputation/scaling statistics come from the whole training part (label-free; the nested CV in
+    `nested_score` re-runs it per outer fold, which covers the small leak)."""
     t0 = time.perf_counter()
     if estimator == "logreg":
         est, step = LogisticRegression(C=0.1, max_iter=300, class_weight="balanced", random_state=SEED), 3
@@ -509,7 +513,8 @@ def select_gwo(task: Task, n: int = 30, iters: int = 40, patience: int = 8, init
                lam: float = LAMBDA, seed: int = SEED, log=None) -> dict:
     """Binary Grey Wolf Optimizer (after Emary et al. 2016): the three best wolves (alpha, beta, delta) guide the
     pack; each leader proposes a bit vector from a sigmoid-squashed step, and the new position is sampled from the
-    average of the three proposals. The coefficient `a` decays linearly from 2 to 0 (exploration -> exploitation)."""
+    average of the three proposals. NOTE: this is a simplified variant -- the crossover step of Emary et al. is
+    replaced by averaging the three leader proposals, so results are not a faithful reproduction of the paper. The coefficient `a` decays linearly from 2 to 0 (exploration -> exploitation)."""
     t0 = time.perf_counter()
     rng = np.random.default_rng(seed)
     p = task.p
